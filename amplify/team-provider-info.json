@@ -1,0 +1,23 @@
+{
+  "dev": {
+    "awscloudformation": {
+      "AuthRoleName": "amplify-bodeapp-dev-94033-authRole",
+      "UnauthRoleArn": "arn:aws:iam::976918245685:role/amplify-bodeapp-dev-94033-unauthRole",
+      "AuthRoleArn": "arn:aws:iam::976918245685:role/amplify-bodeapp-dev-94033-authRole",
+      "Region": "us-east-1",
+      "DeploymentBucketName": "amplify-bodeapp-dev-94033-deployment",
+      "UnauthRoleName": "amplify-bodeapp-dev-94033-unauthRole",
+      "StackName": "amplify-bodeapp-dev-94033",
+      "StackId": "arn:aws:cloudformation:us-east-1:976918245685:stack/amplify-bodeapp-dev-94033/137cbba0-ca41-11ed-b48d-0ed0d50dfa4d",
+      "AmplifyAppId": "djjsxzxmk3gn8"
+    },
+    "categories": {
+      "auth": {
+        "bodeapp1645a2f0": {}
+      },
+      "storage": {
+        "s3514f9ddb": {}
+      }
+    }
+  }
+}
