@@ -1,30 +1,47 @@
-
-import React, { useState } from 'react';
+import React, { useState} from 'react';
 import { StatusBar } from 'expo-status-bar';
-import { StyleSheet, View, Text, Alert, ActivityIndicator, SafeAreaView, ImageBackground } from 'react-native';
+import { StyleSheet, View, Text, Alert, ActivityIndicator, SafeAreaView } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import ButtonAwesome from './components/Button';
 import ImageViewer from './components/ImageViewer';
-import { Button } from "react-native-paper";
-import Icon from 'react-native-vector-icons/FontAwesome';
+import { CustomModal } from './components/ModalResult';
+import { CustomAlert } from './components/ModalAlert';
+
+
+import * as SplashScreen from 'expo-splash-screen';
+import useLoadFonts from './components/useLoadFonts';
+
+SplashScreen.preventAutoHideAsync();
 
 import {Amplify} from '@aws-amplify/core';
 import {Storage} from '@aws-amplify/storage';
 import awsconfig from './src/aws-exports';
 Amplify.configure(awsconfig);
 
-
-const PlaceholderImage = require('./assets/images/background-image.png');
+const PlaceholderImage = require('./assets/images/upload-image.png');
 
 export default function App() {
-
 
   const [selectedImage, setSelectedImage] = useState(null);
   const [shouldShow, setShouldShow] = useState(true);
   const [uploadImage, setUploadImage] = useState(false);
   const [uriImage, setUriImage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const {fontsLoaded, onLayoutRootView } = useLoadFonts();
+  const [isModalVisible, setModalVisible] = useState(false);
+  const [isAlertVisible, setAlertVisible] = useState(false);
 
+  if(!fontsLoaded)
+    return null;
+
+  const toggleModal = () => {
+    setModalVisible(!isModalVisible);
+  };
+
+  
+  const closeAlert = () => {
+    setAlertVisible(false);
+  };
 
   // Upload image to S3 Bucket//
   const fetchImageUri = async (uri) => {
@@ -63,11 +80,10 @@ export default function App() {
 
     if (!result.canceled) {
       setSelectedImage(result.assets[0].uri);
-      //alert("Preparando a imagem. Pode levar alguns segundos.");//
       setUploadImage(false);
       uploadFile(result.assets[0]);
     } else {
-      alert("Você precisa escolher uma imagem.");
+      setAlertVisible(true);
     }
   };
 
@@ -81,20 +97,22 @@ export default function App() {
 		body: JSON.stringify({link: uriImage})
   };
 
+
   const postExample = async () => {
-    alert("A pesagem pode levar até 29 segundos.");
     setIsLoading(true);
     setUploadImage(false);
     try {
       await fetch(
-        'https://smipfhd8n6.execute-api.us-east-1.amazonaws.com/Prod/ocr/', requestOptions)
+        'https://reqres.in/api/posts', requestOptions)
         .then(response => {
           response.json()
             .then(response => {
               setIsLoading(false);
               setShouldShow(true);
-              console.log(response);
-              Alert.alert("Peso estimado em (Kg):", response.response);
+              console.log(response.createdAt);
+              setModalVisible(true);
+              //console.log(response);
+              //Alert.alert("Peso estimado em (Kg):", response.response);
             });
         })
     }
@@ -103,10 +121,8 @@ export default function App() {
     }
   }
 
-  
-
   return (
-  <View style={styles.container}>
+  <View onLayout={onLayoutRootView} style={styles.container}>
 
     {!isLoading ? (
       <View style={styles.imageContainer}>
@@ -118,18 +134,30 @@ export default function App() {
         {shouldShow ? (
           <View style={styles.footerContainer}>
             <ButtonAwesome theme="primary" label="Escolher imagem"  onPress={pickImageAsync} />
+            <CustomModal
+            isVisible={isModalVisible}
+            message="Peso estimado do animal: 15.70 Kg"
+            onOkPressed={toggleModal}
+            />
+            <CustomAlert
+            visible={isAlertVisible}
+            title="Aviso"
+            message="Você precisa escolher uma imagem."
+            onClose={closeAlert}
+            />
           </View>
+          
         ) : null}
 
         {!shouldShow ? (
-        <View style={styles.imageContainer}>
-          <View style={styles.footerContainer}>
-          <SafeAreaView>
-            <ActivityIndicator  style={styles.indicator} size={'large'} color="#f6ddcc"/>
-            <Text style={styles.indicatorText}>Preparando a imagem...</Text>
-          </SafeAreaView>
+          <View style={styles.imageContainer}>
+            <View style={styles.footerContainer}>
+              <SafeAreaView>
+                <ActivityIndicator  style={styles.indicator} size={'large'} color="#f6ddcc"/>
+                <Text style={styles.indicatorText}>Preparando a imagem...</Text>
+              </SafeAreaView>
+            </View>
           </View>
-        </View>
 
         ) : null}
 
@@ -138,17 +166,8 @@ export default function App() {
 
         {uploadImage ? (
           <View style={styles.footerContainer}>
-            <ButtonAwesome theme="primary" label="Escolher outra imagem"  onPress={pickImageAsync} />
-            <View>
-              <Button
-                style={styles.buttonStyle}
-                mode="container"
-                contentStyle={styles.buttonContentStyle}  onPress={postExample}>	
-                <Icon name="balance-scale" size={19} color="#fff" />
-                <View style={{ width: 16, height: 1 }} />
-                <Text style={styles.buttonTextStyle}>Fazer pesagem</Text>
-              </Button>
-            </View>
+            <ButtonAwesome theme="tertiary" label="Fazer pesagem"  onPress={postExample} />
+            <ButtonAwesome theme="secondary" label="Escolher outro animal"  onPress={pickImageAsync} />
           </View>
         ) : null}
 
@@ -157,85 +176,49 @@ export default function App() {
 
    {isLoading ? (
      <View style={styles.imageContainer}>
-          <SafeAreaView>
-            <ActivityIndicator  style={styles.indicator} size={'large'} color="#f6ddcc"/>
-            <Text style={styles.indicatorText}>Calculando o peso...</Text>
-          </SafeAreaView>
+        <SafeAreaView>
+          <ActivityIndicator  style={styles.indicator_upload} size={'large'} color="#F2AF5C"/>
+          <Text style={styles.indicatorText}>Calculando o peso do animal...</Text>
+        </SafeAreaView>
      </View>
-   ) : null}
-      
+     
+   ) : null }
 
-      <StatusBar style="auto" />
-      
+      <StatusBar style="auto" />   
     </View>
-
-
   );
-
-
 
 }
 
 const styles = StyleSheet.create({
     container: {
     flex: 1,
-    backgroundColor: '#25292e',
+    backgroundColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: "center",
   },
     imageContainer: {
-    flex:1, 
-    paddingTop: 58
+    flex: 1,
   },
     footerContainer: {
     flex: 1 / 2,
     alignItems: 'center',
   },
-    buttonContentStyle: {
-    width: 310,
-    height: 68,
-    marginHorizontal: 4,
-    marginVertical:0,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 7,
-    backgroundColor: '#F4A460',
-    borderWidth: 4,
-    borderColor: '#DCDCDC', 
-    borderRadius: 18
-    },
-    buttonStyle: {
-    borderRadius: 10,
-    width: '60%',
-    height: '45%',
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexDirection: 'row',
-      
-  },
-    buttonTextStyle: {
-    color: '#fff',
-    fontSize: 16,
-  },
   indicator: { 
-    marginTop: 300,
-    padding: 10,
-    backgroundColor: '#F4A460',
+    marginTop: 40,
     borderRadius: 18
   },
   indicator_upload: { 
     marginTop: 300,
-    padding: 10,
-    backgroundColor: '#F4A460',
     borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: "center",
   },
   indicatorText: {
-    fontSize: 18,
-    marginTop: 12,
-   color: '#fff',
-
+    fontSize: 16,
+    marginTop: 22,
+    color: '#252940',
+    fontFamily: 'Poppins_Regular',
+    fontWeight: '400',
+    lineHeight: 18,
   },
 
 });
