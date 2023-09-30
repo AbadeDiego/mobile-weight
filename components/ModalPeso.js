@@ -1,28 +1,28 @@
 import { View, Text, Modal, TouchableOpacity, StyleSheet, Image } from 'react-native';
 
-export function CustomModal({ isVisible, message, onOkPressed }) {
+export function PesoModal({ isAvailable, message, onOkClosed }) {
  
-  const handleOkPressed = () => {
-    onOkPressed();
+  const handleOkClosed = () => {
+    onOkClosed();
   };
 
   return (
     <Modal
-      animationType="slide-up"
+      animationType="slide"
       transparent={true}
-      visible={isVisible}
+      visible={isAvailable}
     >
       <View style={styles.modalContainer}>
         <View style={styles.modalContent}>
           <Image
-            source={require('../assets/images/sucess.png')} // Substitua pelo caminho da sua imagem
+            source={require('../assets/images/unavailable.png')} // Substitua pelo caminho da sua imagem
             style={styles.image}
           />
           <View style={styles.line} />
-          <Text style={styles.modalTitle}>Pesagem realizada!</Text>
+          <Text style={styles.modalTitle}>Pesagem indisponível</Text>
           <Text style={styles.modalText}>{message}</Text>
-          <TouchableOpacity onPress={handleOkPressed} style={styles.okButton}>
-            <Text style={styles.okButtonText}>Fazer nova pesagem</Text>
+          <TouchableOpacity onPress={handleOkClosed} style={styles.okButton}>
+            <Text style={styles.okButtonText}>OK, entendi.</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -32,14 +32,14 @@ export function CustomModal({ isVisible, message, onOkPressed }) {
 
 const styles = StyleSheet.create({
   modalContainer: {
-    flex: 4/5,
+    flex: 0.86,
     alignItems: 'center',
     justifyContent: 'center',
   },
   modalContent: {
     backgroundColor: 'white',
     width: 329,
-    height: 330,
+    height: 375,
     borderRadius: 10,
     alignItems: 'center', 
     justifyContent: 'center',
@@ -58,21 +58,22 @@ const styles = StyleSheet.create({
     height: 1, // Altura da linha
     width: 328, // Largura da linha
     marginTop: 25, // Margem do topo da imagem
-    marginBottom: 20, // Margem do topo da imagem
+    marginBottom: 15, 
+    marginClosed: 20, // Margem do topo da imagem
     backgroundColor: '#ECECED', // Cor da linha
   },
   image: {
-    width: 67,
-    height: 67,
+    width: 80,
+    height: 80,
   },
   modalText: {
     color: '#252940',
     fontFamily: 'Poppins_Regular',
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '400',
     lineHeight: 20,
     letterSpacing: 0.2,
-    marginTop: 20
+    marginTop: 25
   },
   okButton: {
     width: 297,
@@ -80,7 +81,7 @@ const styles = StyleSheet.create({
     padding: 8,
     backgroundColor: 'rgba(242, 175, 92, 0.97)',
     borderRadius: 5,
-    marginTop: 18,
+    marginTop: 30,
     alignItems: 'center', // Centraliza os elementos horizontalmente
     justifyContent: 'center', // Centraliza os elementos verticalmente
   },

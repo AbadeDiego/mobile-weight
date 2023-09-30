@@ -1,12 +1,17 @@
-import React, { useState} from 'react';
+import React, { useState, useEffect } from 'react';
 import { StatusBar } from 'expo-status-bar';
-import { StyleSheet, View, Text, Alert, ActivityIndicator, SafeAreaView } from 'react-native';
+import { StyleSheet, View, Text, ActivityIndicator, SafeAreaView } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import ButtonAwesome from './components/Button';
 import ImageViewer from './components/ImageViewer';
 import { CustomModal } from './components/ModalResult';
 import { CustomAlert } from './components/ModalAlert';
+import { PesoModal } from './components/ModalPeso';
+import  IntroSlides  from './components/IntroSlides';
 
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+const MAX_IMAGES_PER_DAY = 10; // Limite máximo de imagens por dia (24 horas)
 
 import * as SplashScreen from 'expo-splash-screen';
 import useLoadFonts from './components/useLoadFonts';
@@ -30,6 +35,33 @@ export default function App() {
   const {fontsLoaded, onLayoutRootView } = useLoadFonts();
   const [isModalVisible, setModalVisible] = useState(false);
   const [isAlertVisible, setAlertVisible] = useState(false);
+  const [isAlertPesoAvailable, setAlertPesoAvailable] = useState(false);
+  const [modalText, setModalText] = useState('');
+  const [introDone, setIntroDone] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    // Verifique se o tutorial já foi concluído ao iniciar o aplicativo
+    AsyncStorage.getItem('tutorialCompleted')
+      .then((value) => {
+        if (value === 'true') {
+          setIntroDone(true);
+        }
+        setLoading(false);
+      })
+      .catch((error) => {
+        console.error('Erro ao verificar o estado do tutorial:', error);
+        setLoading(false);
+      });
+  }, []);
+
+  const handleIntroDone = async () => {
+    // Defina o estado para indicar que a introdução foi concluída
+    setIntroDone(true);
+
+    // Armazene a informação de que o tutorial foi concluído
+    await AsyncStorage.setItem('tutorialCompleted', 'true');
+  };
 
   if(!fontsLoaded)
     return null;
@@ -38,9 +70,12 @@ export default function App() {
     setModalVisible(!isModalVisible);
   };
 
-  
   const closeAlert = () => {
     setAlertVisible(false);
+  };
+
+  const closePeso = () => {
+    setAlertPesoAvailable(false);
   };
 
   // Upload image to S3 Bucket//
@@ -48,28 +83,60 @@ export default function App() {
     const response = await fetch(uri);
     const blob = await response.blob();
     return blob;
-  }       
+  }
   const uploadFile = async (file) => {
     setShouldShow(false);
-    const img = await fetchImageUri(file.uri);
-    return Storage.put(`bode-${Math.random()}.jpg`, img, {
-      level:'public',
-      contentType:file.type,
-    })
-    .then((res) => {
-      Storage.get(res.key)
-      .then((result) => {
-        var image = result.substring(0,result.indexOf('?'));
-        setUriImage(image);
-        setUploadImage(true);
-      })
-      .catch(e => {
-        console.log(e);
-      })
-    }).catch(e => {
-      console.log(e);
-    })
-  }
+    try {
+      // Verifica o número de imagens enviadas nas últimas 24 horas
+      const imagesUploadedToday = await getImagesUploadedToday();
+      
+      if (imagesUploadedToday >= MAX_IMAGES_PER_DAY) {
+        setAlertPesoAvailable(true);
+        return;
+      }
+      
+      const img = await fetchImageUri(file.uri);
+      const uploadResult = await Storage.put(`bode-${Math.random()}.jpg`, img, {
+        level: 'public',
+        contentType: file.type,
+      });
+  
+      const result = await Storage.get(uploadResult.key);
+      const image = result.substring(0, result.indexOf('?'));
+      setUriImage(image);
+      setUploadImage(true);
+  
+      // Atualize o contador de imagens enviadas hoje
+      await updateImagesUploadedToday(imagesUploadedToday + 1);
+    } catch (error) {
+      console.error('Erro no upload da imagem:', error);
+    }
+  };
+  
+  const getImagesUploadedToday = async () => {
+    try {
+      const today = new Date();
+      const dateString = today.toISOString().split('T')[0]; // Obtém a data no formato "AAAA-MM-DD"
+      const key = `imagesUploaded-${dateString}`;
+      const value = await AsyncStorage.getItem(key);
+      return parseInt(value, 10) || 0;
+    } catch (error) {
+      console.error('Erro ao obter contador de imagens:', error);
+      return 0;
+    }
+  };
+  
+  const updateImagesUploadedToday = async (count) => {
+    try {
+      const today = new Date();
+      const dateString = today.toISOString().split('T')[0]; // Obtém a data no formato "AAAA-MM-DD"
+      const key = `imagesUploaded-${dateString}`;
+      await AsyncStorage.setItem(key, count.toString());
+    } catch (error) {
+      console.error('Erro ao atualizar contador de imagens:', error);
+    }
+  };       
+
   // Pick image from gallery//
 
   const pickImageAsync = async () => {
@@ -103,15 +170,18 @@ export default function App() {
     setUploadImage(false);
     try {
       await fetch(
-        'https://reqres.in/api/posts', requestOptions)
+        'https://45xiv4ibx9.execute-api.sa-east-1.amazonaws.com/Prod/ocr/', requestOptions)
         .then(response => {
           response.json()
             .then(response => {
               setIsLoading(false);
               setShouldShow(true);
-              console.log(response.createdAt);
+              const pesoEstimado = response.response;
+              const modalText = `Peso estimado do animal: ${pesoEstimado} Kg`;
+              setModalText(modalText);
               setModalVisible(true);
-              //console.log(response);
+              //console.log(response.response);
+              //console.log(response.createdAt);
               //Alert.alert("Peso estimado em (Kg):", response.response);
             });
         })
@@ -122,71 +192,74 @@ export default function App() {
   }
 
   return (
-  <View onLayout={onLayoutRootView} style={styles.container}>
-
-    {!isLoading ? (
-      <View style={styles.imageContainer}>
-        <ImageViewer placeholderImageSource={PlaceholderImage} selectedImage={selectedImage}/>
-       
-        {!uploadImage ? (<View>  
-
-        
-        {shouldShow ? (
-          <View style={styles.footerContainer}>
-            <ButtonAwesome theme="primary" label="Escolher imagem"  onPress={pickImageAsync} />
-            <CustomModal
-            isVisible={isModalVisible}
-            message="Peso estimado do animal: 15.70 Kg"
-            onOkPressed={toggleModal}
-            />
-            <CustomAlert
-            visible={isAlertVisible}
-            title="Aviso"
-            message="Você precisa escolher uma imagem."
-            onClose={closeAlert}
-            />
-          </View>
-          
-        ) : null}
-
-        {!shouldShow ? (
-          <View style={styles.imageContainer}>
-            <View style={styles.footerContainer}>
-              <SafeAreaView>
-                <ActivityIndicator  style={styles.indicator} size={'large'} color="#f6ddcc"/>
-                <Text style={styles.indicatorText}>Preparando a imagem...</Text>
-              </SafeAreaView>
+    <View onLayout={onLayoutRootView} style={styles.container}>
+      {!isLoading && !introDone ? (
+        <IntroSlides onDone={handleIntroDone} />
+      ) : null}
+  
+      {!isLoading && introDone ? (
+        <View style={styles.imageContainer}>
+          <ImageViewer placeholderImageSource={PlaceholderImage} selectedImage={selectedImage} />
+  
+          {!uploadImage ? (
+            <View>
+              {shouldShow ? (
+                <View style={styles.footerContainer}>
+                  <ButtonAwesome theme="primary" label="Escolher imagem" onPress={pickImageAsync} />
+                  <CustomModal
+                    isVisible={isModalVisible}
+                    message={modalText}
+                    onOkPressed={toggleModal}
+                  />
+                  <CustomAlert
+                    visible={isAlertVisible}
+                    title="Aviso"
+                    message="Você precisa escolher uma imagem."
+                    onClose={closeAlert}
+                  />
+                </View>
+              ) : null}
+  
+              {!shouldShow ? (
+                <View style={styles.imageContainer}>
+                  <View style={styles.footerContainer}>
+                    <SafeAreaView>
+                      <ActivityIndicator style={styles.indicator} size={'large'} color="#f6ddcc" />
+                      <Text style={styles.indicatorText}>Preparando a imagem...</Text>
+                    </SafeAreaView>
+                    <PesoModal
+                      isAvailable={isAlertPesoAvailable}
+                      message="Limite diário de pesagens atingido. "
+                      onOkClosed={closePeso}
+                    />
+                  </View>
+                </View>
+              ) : null}
             </View>
-          </View>
-
-        ) : null}
-
-        </View>) : null}
-
-
-        {uploadImage ? (
-          <View style={styles.footerContainer}>
-            <ButtonAwesome theme="tertiary" label="Fazer pesagem"  onPress={postExample} />
-            <ButtonAwesome theme="secondary" label="Escolher outro animal"  onPress={pickImageAsync} />
-          </View>
-        ) : null}
-
-      </View>
-     ) : null}
-
-   {isLoading ? (
-     <View style={styles.imageContainer}>
-        <SafeAreaView>
-          <ActivityIndicator  style={styles.indicator_upload} size={'large'} color="#F2AF5C"/>
-          <Text style={styles.indicatorText}>Calculando o peso do animal...</Text>
-        </SafeAreaView>
-     </View>
-     
-   ) : null }
-
-      <StatusBar style="auto" />   
+          ) : null}
+  
+          {uploadImage ? (
+            <View style={styles.footerContainer}>
+              <ButtonAwesome theme="tertiary" label="Fazer pesagem" onPress={postExample} />
+              <ButtonAwesome theme="secondary" label="Escolher outro animal" onPress={pickImageAsync} />
+            </View>
+          ) : null}
+        </View>
+      ) : null}
+  
+      {isLoading ? (
+        <View style={styles.imageContainer}>
+          <SafeAreaView>
+            <ActivityIndicator style={styles.indicator_upload} size={'large'} color="#F2AF5C" />
+            <Text style={styles.indicatorText}>Calculando o peso do animal...</Text>
+          </SafeAreaView>
+        </View>
+      ) : null}
+  
+      <StatusBar style="auto" />
     </View>
   );
+  
 
 }
 
@@ -222,4 +295,3 @@ const styles = StyleSheet.create({
   },
 
 });
-
